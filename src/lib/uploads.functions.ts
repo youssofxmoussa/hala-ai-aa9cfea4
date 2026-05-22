@@ -3,7 +3,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const UploadInput = z.object({
   dataUrl: z.string().min(8).max(40 * 1024 * 1024), // ~30MB cap on base64
@@ -33,7 +32,7 @@ export const uploadChatAttachment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => UploadInput.parse(input))
   .handler(async ({ data, context }) => {
-    const { userId } = context;
+    const { supabase, userId } = context;
     const { bytes, mime } = dataUrlToBlob(data.dataUrl);
     if (!ALLOWED.has(mime)) throw new Error(`Unsupported file type: ${mime}`);
 
@@ -41,11 +40,11 @@ export const uploadChatAttachment = createServerFn({ method: "POST" })
     const safeName = data.filename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
     const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}.${ext}`;
 
-    const { error } = await supabaseAdmin.storage
+    const { error } = await supabase.storage
       .from("chat-uploads")
       .upload(path, bytes, { contentType: mime, upsert: false });
     if (error) throw new Error(`Upload failed: ${error.message}`);
 
-    const { data: pub } = supabaseAdmin.storage.from("chat-uploads").getPublicUrl(path);
+    const { data: pub } = supabase.storage.from("chat-uploads").getPublicUrl(path);
     return { url: pub.publicUrl, mime, path };
   });
