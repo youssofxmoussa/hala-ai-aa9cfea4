@@ -42,7 +42,7 @@ export function Markdown({ content }: { content: string }) {
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex, rehypeHighlight]}
         components={{
-          pre: ({ children }) => <>{children}</>,
+          pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
           code: ({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) => {
             const isBlock = /language-/.test(className || "");
             if (isBlock) return <CodeBlock className={className}>{children}</CodeBlock>;
@@ -52,7 +52,7 @@ export function Markdown({ content }: { content: string }) {
               </code>
             );
           },
-          a: ({ href, children }) => (
+          a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
             <a href={href} target="_blank" rel="noreferrer noopener">
               {children}
             </a>
