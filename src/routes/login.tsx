@@ -44,14 +44,11 @@ function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: typeof window !== "undefined" ? window.location.origin + "/chat" : undefined,
-        },
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin + "/chat",
       });
-      if (error) {
-        setError(error.message);
+      if (result.error) {
+        setError(result.error.message);
         setLoading(false);
       }
     } catch (e) {
