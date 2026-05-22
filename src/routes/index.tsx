@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import {
   ArrowRight,
   Eye,
@@ -12,20 +12,27 @@ import {
   Zap,
 } from "lucide-react";
 import logoUrl from "@/assets/halagpt-logo.png";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
+  ssr: false,
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) throw redirect({ to: "/chat" });
+  },
   component: Home,
   head: () => ({
     meta: [
-      { title: "Hala AI" },
+      { title: "Hala AI — Palestinian AI assistant" },
       {
         name: "description",
-        content: "Hala is a Palestinian AI from Palestine.",
+        content:
+          "Hala is a Palestinian AI assistant. Chat, vision & OCR, web search, code, and deep reasoning — in any language.",
       },
       { property: "og:title", content: "Hala AI" },
       {
         property: "og:description",
-        content: "Hala is a Palestinian AI from Palestine.",
+        content: "A Palestinian AI assistant — refined, fast, multilingual.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "/" },
@@ -108,6 +115,71 @@ function Home() {
             >
               See what she can do
             </a>
+          </div>
+        </div>
+
+        {/* Chat preview mockup */}
+        <div className="relative mx-auto mt-4 max-w-5xl px-5 pb-24">
+          <div className="relative overflow-hidden rounded-[28px] border border-border bg-background shadow-[0_60px_120px_-40px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between border-b border-border/60 bg-[oklch(0.985_0_0)] px-5 py-3">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.85_0_0)]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.85_0_0)]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.85_0_0)]" />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <img src={logoUrl} alt="" className="h-4 w-4" />
+                hala.ai / chat
+              </div>
+              <div className="w-10" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-[220px_1fr]">
+              <aside className="hidden border-r border-border/60 bg-[oklch(0.985_0_0)] p-3 md:block">
+                <div className="rounded-full bg-foreground px-3 py-2 text-center text-xs font-medium text-background">+ New chat</div>
+                <div className="mt-4 space-y-1.5">
+                  {["Trip plan to Petra", "Summarize this PDF", "React vs Vue", "Translate to Arabic", "OCR receipt"].map((t) => (
+                    <div key={t} className="truncate rounded-lg px-3 py-2 text-[12px] text-muted-foreground hover:bg-background">
+                      {t}
+                    </div>
+                  ))}
+                </div>
+              </aside>
+              <div className="space-y-5 p-6 text-left">
+                <div className="flex justify-end">
+                  <div className="max-w-[80%] rounded-2xl rounded-tr-md bg-foreground px-4 py-2.5 text-sm text-background">
+                    Plan a 3-day trip to Petra for 2 people on a small budget.
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <img src={logoUrl} alt="" className="h-7 w-7 rounded-full border border-border" />
+                  <div className="max-w-[80%] space-y-2 rounded-2xl rounded-tl-md border border-border bg-[oklch(0.985_0_0)] px-4 py-3 text-sm text-foreground">
+                    <p className="font-medium">Here's a refined 3-day Petra plan ✦</p>
+                    <ul className="ml-4 list-disc space-y-1 text-[13px] text-muted-foreground">
+                      <li><b className="text-foreground">Day 1</b> — Visitor center → Siq → Treasury at golden hour.</li>
+                      <li><b className="text-foreground">Day 2</b> — Monastery hike (800 steps) → Royal tombs.</li>
+                      <li><b className="text-foreground">Day 3</b> — Little Petra + Wadi Rum jeep tour.</li>
+                    </ul>
+                    <p className="text-[13px] text-muted-foreground">Est. budget: ~$220 / person incl. 2-day pass.</p>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <div className="max-w-[80%] rounded-2xl rounded-tr-md bg-foreground px-4 py-2.5 text-sm text-background">
+                    اقرأ هذي الفاتورة بالعربي 📷
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <img src={logoUrl} alt="" className="h-7 w-7 rounded-full border border-border" />
+                  <div className="max-w-[80%] rounded-2xl rounded-tl-md border border-border bg-[oklch(0.985_0_0)] px-4 py-3 text-sm" dir="rtl">
+                    تمام — قرأت الفاتورة. المجموع <b>JD 42.50</b>، تتضمن ضريبة <b>16%</b>. أكبر بند: عشاء <b>JD 18.00</b>.
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2.5">
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-[oklch(0.96_0_0)] text-muted-foreground">+</span>
+                  <span className="flex-1 text-sm text-muted-foreground">Message Hala…</span>
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-foreground text-background">↑</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
