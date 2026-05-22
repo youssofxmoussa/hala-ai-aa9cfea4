@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const [ok, setOk] = useState(true);
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e: string, session: { user: unknown } | null) => {
       setOk(!!session);
       if (!session && typeof window !== "undefined") {
         window.location.href = "/login";
