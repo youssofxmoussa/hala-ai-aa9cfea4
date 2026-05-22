@@ -74,7 +74,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/png", href: "/halagpt-logo.png" },
       { rel: "apple-touch-icon", href: "/halagpt-logo.png" },
-      ],
     ],
   }),
   shellComponent: RootShell,
