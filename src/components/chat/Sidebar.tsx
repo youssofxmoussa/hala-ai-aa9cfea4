@@ -23,11 +23,26 @@ import {
   Palette,
   GraduationCap,
   Sparkles,
+  User,
   type LucideIcon,
 } from "lucide-react";
 import type { Conversation, Project } from "./types";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { auth } from "@/lib/firebase";
 import logoUrl from "@/assets/halagpt-logo.png";
+
+function UserAvatar() {
+  const photo = auth.currentUser?.photoURL;
+  if (photo) {
+    return <img src={photo} alt="" className="h-9 w-9 rounded-full border border-border object-cover" referrerPolicy="no-referrer" />;
+  }
+  return (
+    <span className="grid h-9 w-9 place-items-center rounded-full bg-[oklch(0.94_0_0)] text-foreground">
+      <User size={18} strokeWidth={2} />
+    </span>
+  );
+}
 
 type View = "home" | "projects" | "images";
 
@@ -98,10 +113,15 @@ export function Sidebar({
         {/* Top bar */}
         {view === "home" ? (
           <div className="flex items-center justify-between px-5 pt-6 pb-2">
-            <div className="flex items-center gap-2.5">
-              <img src={logoUrl} alt="" className="h-7 w-7" />
+            <Link
+              to="/settings"
+              onClick={onToggle}
+              className="flex items-center gap-2.5 rounded-full pr-3 transition hover:bg-[oklch(0.97_0_0)]"
+              aria-label="Open settings"
+            >
+              <UserAvatar />
               <h1 className="text-2xl font-semibold tracking-tight">HalaGPT</h1>
-            </div>
+            </Link>
             <div className="flex items-center gap-1 rounded-full bg-[oklch(0.96_0_0)] px-1 py-1">
               <button
                 onClick={() => setSearching((s) => !s)}

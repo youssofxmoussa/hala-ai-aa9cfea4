@@ -6,14 +6,13 @@ type Props = {
   messages: ChatMessage[];
   loading: boolean;
   onRegenerate: () => void;
+  onFeedback?: (messageId: string, v: "up" | "down" | null) => void;
 };
 
-export function ChatView({ messages, loading, onRegenerate }: Props) {
+export function ChatView({ messages, loading, onRegenerate, onFeedback }: Props) {
   const endRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
   useEffect(() => {
-    // First mount (e.g. switching to a loaded chat) jumps instantly; subsequent
-    // updates (streaming) glide smoothly.
     endRef.current?.scrollIntoView({
       behavior: mountedRef.current ? "smooth" : "auto",
       block: "end",
@@ -34,6 +33,7 @@ export function ChatView({ messages, loading, onRegenerate }: Props) {
               m={m}
               streaming={loading && isLast}
               onRegenerate={isLast ? onRegenerate : undefined}
+              onFeedback={(v) => onFeedback?.(m.id, v)}
             />
           );
         })}

@@ -85,10 +85,24 @@ function HalaGPTChat() {
     setProjects((prev) => [{ id: uid(), createdAt: Date.now(), ...p }, ...prev]);
 
   const handleUpload = async (file: File): Promise<ChatAttachment> => {
-    const dataUrl = await fileToDataUrl(file);
-    const mime = file.type || "application/octet-stream";
-    return { url: dataUrl, mime, name: file.name, previewUrl: mime.startsWith("image/") ? dataUrl : undefined };
+    const previewUrl = file.type.startsWith("image/") ? await fileToDataUrl(file) : undefined;
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    const data = (await res.json()) as { url?: string; error?: string; mime?: string; size?: number };
+    if (!res.ok || !data.url) throw new Error(data.error || "Upload failed");
+    return { url: data.url, mime: data.mime || file.type || "application/octet-stream", name: file.name, size: data.size ?? file.size, previewUrl };
   };
+
+  const setFeedback = (messageId: string, v: "up" | "down" | null) => {
+    setConversations((prev) =>
+      prev.map((c) => ({
+        ...c,
+        messages: c.messages.map((m) => (m.id === messageId ? { ...m, feedback: v } : m)),
+      })),
+    );
+  };
+
 
   const callApi = async (msgs: ChatMessage[], deepThink: boolean): Promise<string> => {
     const payload = {
@@ -312,7 +326,7 @@ function HalaGPTChat() {
         )}
 
         <div className={`flex-1 overflow-y-auto transition-opacity duration-300 ${isEmpty ? "opacity-0" : "opacity-100"}`}>
-          <ChatView messages={active?.messages ?? []} loading={loading} onRegenerate={regenerate} />
+          <ChatView messages={active?.messages ?? []} loading={loading} onRegenerate={regenerate} onFeedback={setFeedback} />
         </div>
 
         <div className={`relative z-10 transition-all duration-500 ease-out ${isEmpty ? "-translate-y-[20vh]" : "translate-y-0"}`}>
