@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Copy, Check, RotateCcw, ThumbsUp, ThumbsDown, FileText, Brain, ChevronDown } from "lucide-react";
+import { Copy, Check, RotateCcw, ThumbsUp, ThumbsDown, Brain, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 import { Markdown } from "./Markdown";
+import { FileBadge } from "./FileIcon";
 import type { ChatMessage } from "./types";
 
-// Detect Arabic / Hebrew / Persian — return "rtl" if the message is predominantly RTL.
 function detectDir(text: string): "ltr" | "rtl" {
   if (!text) return "ltr";
-  // Strip code blocks first (those should stay LTR)
   const stripped = text.replace(/```[\s\S]*?```/g, "").replace(/`[^`]+`/g, "");
   const rtlChars = stripped.match(/[\u0590-\u08FF\uFB1D-\uFEFC]/g)?.length ?? 0;
   const latinChars = stripped.match(/[A-Za-z]/g)?.length ?? 0;
@@ -14,13 +14,11 @@ function detectDir(text: string): "ltr" | "rtl" {
   return rtlChars >= latinChars ? "rtl" : "ltr";
 }
 
-// Split content into { thinking, answer } based on <thinking>...</thinking> blocks.
 function splitThinking(text: string): { thinking: string | null; answer: string; thinkingOpen: boolean } {
   const openIdx = text.indexOf("<thinking>");
   if (openIdx === -1) return { thinking: null, answer: text, thinkingOpen: false };
   const closeIdx = text.indexOf("</thinking>", openIdx);
   if (closeIdx === -1) {
-    // Still streaming the thinking block
     return {
       thinking: text.slice(openIdx + "<thinking>".length),
       answer: "",
@@ -48,30 +46,11 @@ export function UserMessage({ m }: { m: ChatMessage }) {
                   className="max-h-60 rounded-2xl border border-border object-cover"
                 />
               ) : (
-                <a
-                  key={i}
-                  href={a.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-border bg-[oklch(0.97_0_0)] px-3 py-2 text-xs text-foreground hover:bg-[oklch(0.95_0_0)] transition"
-                >
-                  <FileText size={14} />
-                  <span className="max-w-[200px] truncate">{a.name}</span>
+                <a key={i} href={a.url} target="_blank" rel="noreferrer" className="block w-64">
+                  <FileBadge name={a.name} mime={a.mime} size={a.size} />
                 </a>
               ),
             )}
-          </div>
-        )}
-        {m.images && m.images.length > 0 && !m.attachments?.length && (
-          <div className="flex flex-wrap justify-end gap-2">
-            {m.images.map((img, i) => (
-              <img
-                key={i}
-                src={img.dataUrl}
-                alt={img.name}
-                className="max-h-60 rounded-2xl border border-border object-cover"
-              />
-            ))}
           </div>
         )}
         {m.content && (
@@ -89,6 +68,7 @@ export function UserMessage({ m }: { m: ChatMessage }) {
   );
 }
 
+// Slower, smoother typewriter — feels deliberate, not jittery.
 function useTypewriter(content: string, enabled: boolean, onTick?: () => void) {
   const [shown, setShown] = useState(enabled ? "" : content);
   const idxRef = useRef(0);
@@ -116,8 +96,9 @@ function useTypewriter(content: string, enabled: boolean, onTick?: () => void) {
         rafRef.current = null;
         return;
       }
-      const baseCps = 110;
-      const boost = Math.min(8, 1 + remaining / 80);
+      // ~45 cps base (slower & smoother than before), with mild boost if backlog
+      const baseCps = 45;
+      const boost = Math.min(2.5, 1 + remaining / 400);
       const inc = Math.max(1, Math.round((dt / 1000) * baseCps * boost));
       idxRef.current = Math.min(content.length, idxRef.current + inc);
       setShown(content.slice(0, idxRef.current));
@@ -171,13 +152,14 @@ export function AssistantMessage({
   m,
   streaming,
   onRegenerate,
+  onFeedback,
 }: {
   m: ChatMessage;
   streaming?: boolean;
   onRegenerate?: () => void;
+  onFeedback?: (v: "up" | "down" | null) => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const scrollToEnd = () => anchorRef.current?.scrollIntoView({ block: "end" });
 
@@ -187,12 +169,21 @@ export function AssistantMessage({
   const copy = async () => {
     await navigator.clipboard.writeText(m.content);
     setCopied(true);
+    toast.success("Copied to clipboard");
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const setFeedback = (v: "up" | "down") => {
+    const next = m.feedback === v ? null : v;
+    onFeedback?.(next);
+    if (next === "up") toast.success("Thanks for the feedback");
+    else if (next === "down") toast("Feedback noted", { description: "We'll use this to improve." });
   };
 
   const { thinking, answer, thinkingOpen } = splitThinking(shown);
   const dir = detectDir(answer);
   const showThinking = streaming && !m.content;
+  const feedback = m.feedback ?? null;
 
   return (
     <div className="w-full animate-rise">
@@ -217,6 +208,7 @@ export function AssistantMessage({
             onClick={copy}
             className="inline-flex items-center gap-1 rounded-lg p-1.5 text-xs hover:bg-accent hover:text-foreground transition"
             aria-label="Copy"
+            title="Copy"
           >
             {copied ? <Check size={13} /> : <Copy size={13} />}
           </button>
@@ -225,27 +217,30 @@ export function AssistantMessage({
               onClick={onRegenerate}
               className="inline-flex items-center gap-1 rounded-lg p-1.5 text-xs hover:bg-accent hover:text-foreground transition"
               aria-label="Regenerate"
+              title="Regenerate"
             >
               <RotateCcw size={13} />
             </button>
           )}
           <button
-            onClick={() => setFeedback((f) => (f === "up" ? null : "up"))}
+            onClick={() => setFeedback("up")}
             className={`inline-flex items-center gap-1 rounded-lg p-1.5 text-xs transition hover:bg-accent hover:text-foreground ${
-              feedback === "up" ? "text-foreground" : ""
+              feedback === "up" ? "bg-accent text-foreground" : ""
             }`}
             aria-label="Good response"
             aria-pressed={feedback === "up"}
+            title="Good response"
           >
             <ThumbsUp size={13} fill={feedback === "up" ? "currentColor" : "none"} />
           </button>
           <button
-            onClick={() => setFeedback((f) => (f === "down" ? null : "down"))}
+            onClick={() => setFeedback("down")}
             className={`inline-flex items-center gap-1 rounded-lg p-1.5 text-xs transition hover:bg-accent hover:text-foreground ${
-              feedback === "down" ? "text-foreground" : ""
+              feedback === "down" ? "bg-accent text-foreground" : ""
             }`}
             aria-label="Bad response"
             aria-pressed={feedback === "down"}
+            title="Bad response"
           >
             <ThumbsDown size={13} fill={feedback === "down" ? "currentColor" : "none"} />
           </button>

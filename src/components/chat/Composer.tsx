@@ -9,22 +9,23 @@ import {
   Globe,
   Image as ImageIcon,
   Paperclip,
-  FileText,
   Check,
 } from "lucide-react";
 import type { ChatAttachment } from "./types";
+import { getFileSpec, formatBytes } from "./FileIcon";
 
 type Props = {
   onSend: (text: string, attachments: ChatAttachment[], opts: { deepThink: boolean; search: boolean }) => void;
   loading: boolean;
   onStop?: () => void;
   luxe?: boolean;
-  onUpload: (file: File) => Promise<ChatAttachment>; // upload to server, return public URL
-  onImageRequest?: () => void; // hook for "Create image" action
+  onUpload: (file: File) => Promise<ChatAttachment>;
+  onImageRequest?: () => void;
 };
 
-const MAX_ATTACHMENTS = 5;
-const ACCEPT = "image/*,application/pdf";
+const MAX_ATTACHMENTS = 10;
+// Accept literally anything
+const ACCEPT = "*/*";
 
 export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onImageRequest }: Props) {
   const [text, setText] = useState("");
@@ -53,7 +54,6 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
 
-  // Auto-RTL the textarea based on first strong character.
   const dir: "ltr" | "rtl" = (() => {
     const stripped = text.replace(/```[\s\S]*?```/g, "");
     const m = stripped.match(/[A-Za-z\u0590-\u08FF\uFB1D-\uFEFC]/);
@@ -69,7 +69,6 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
       const list = Array.from(files).slice(0, slots);
       const uploaded: ChatAttachment[] = [];
       for (const f of list) {
-        if (!f.type.startsWith("image/") && f.type !== "application/pdf") continue;
         try {
           const a = await onUpload(f);
           uploaded.push(a);
@@ -91,7 +90,6 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
     setText("");
     setAttachments([]);
     setSearch(false);
-    // keep deepThink sticky — feels like ChatGPT's toggle
   };
 
   return (
@@ -110,7 +108,7 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
         className={`relative rounded-[28px] border transition ${
           luxe
             ? "border-white/20 bg-white/[0.04] text-white shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-xl focus-within:border-white/40"
-            : "border-border bg-background text-foreground shadow-[0_8px_30px_-12px_rgba(0,0,0,0.12)] focus-within:shadow-[0_12px_40px_-12px_rgba(0,0,0,0.2)] focus-within:border-foreground/30"
+            : "border-border bg-background text-foreground shadow-[0_8px_30px_-12px_rgba(0,0,0,0.12)] focus-within:shadow-[0_16px_50px_-12px_rgba(0,0,0,0.22)] focus-within:border-foreground/40"
         } ${dragOver ? (luxe ? "ring-4 ring-white/15" : "border-foreground/60 ring-4 ring-foreground/5") : ""}`}
       >
         {dragOver && (
@@ -124,26 +122,11 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2.5 p-3 pb-1">
             {attachments.map((a, i) => (
-              <div
+              <AttachmentPreview
                 key={i}
-                className={`group relative h-20 ${a.mime.startsWith("image/") ? "w-20" : "w-44"} overflow-hidden rounded-2xl border border-border bg-[oklch(0.97_0_0)] shadow-sm transition hover:shadow-md`}
-              >
-                {a.mime.startsWith("image/") ? (
-                  <img src={a.previewUrl ?? a.url} alt={a.name} className="h-full w-full object-cover transition group-hover:scale-105" />
-                ) : (
-                  <div className="flex h-full items-center gap-2 px-3">
-                    <FileText size={20} className="shrink-0 text-foreground/70" />
-                    <span className="truncate text-xs font-medium text-foreground">{a.name}</span>
-                  </div>
-                )}
-                <button
-                  onClick={() => setAttachments((p) => p.filter((_, j) => j !== i))}
-                  className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:bg-foreground hover:text-background"
-                  aria-label="Remove"
-                >
-                  <X size={12} strokeWidth={2.5} />
-                </button>
-              </div>
+                att={a}
+                onRemove={() => setAttachments((p) => p.filter((_, j) => j !== i))}
+              />
             ))}
           </div>
         )}
@@ -167,8 +150,7 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
         />
 
         <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-1">
-          <div className="flex items-center gap-1.5 relative" ref={menuRef}>
-            {/* + menu */}
+          <div className="flex items-center gap-1.5 relative flex-wrap" ref={menuRef}>
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
@@ -183,6 +165,22 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
               <Plus size={17} strokeWidth={2.25} className={`transition duration-300 ${menuOpen ? "rotate-45" : "group-hover:rotate-90"}`} />
             </button>
 
+            {/* Inline Deep Think + Search buttons (always visible, ChatGPT-style pills) */}
+            <ToggleChip
+              active={deepThink}
+              onClick={() => setDeepThink((v) => !v)}
+              icon={<Brain size={14} />}
+              label="Think"
+              luxe={luxe}
+            />
+            <ToggleChip
+              active={search}
+              onClick={() => setSearch((v) => !v)}
+              icon={<Globe size={14} />}
+              label="Search"
+              luxe={luxe}
+            />
+
             {menuOpen && (
               <div
                 className={`absolute bottom-12 left-0 z-40 w-64 overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-xl animate-rise ${
@@ -192,7 +190,7 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
                 <MenuItem
                   icon={<Paperclip size={16} />}
                   label="Attach files"
-                  hint="Image, PDF"
+                  hint="Any file"
                   onClick={() => {
                     setMenuOpen(false);
                     fileRef.current?.click();
@@ -201,7 +199,7 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
                 <MenuItem
                   icon={<ImageIcon size={16} />}
                   label="Create image"
-                  hint="Beta — coming soon"
+                  hint="Beta"
                   onClick={() => {
                     setMenuOpen(false);
                     onImageRequest?.();
@@ -227,14 +225,6 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
                     setMenuOpen(false);
                   }}
                 />
-              </div>
-            )}
-
-            {/* Sticky pill indicators */}
-            {(deepThink || search) && (
-              <div className="ml-1 flex items-center gap-1.5">
-                {deepThink && <ModePill icon={<Brain size={12} />} label="Deep Think" onClear={() => setDeepThink(false)} luxe={luxe} />}
-                {search && <ModePill icon={<Globe size={12} />} label="Search" onClear={() => setSearch(false)} luxe={luxe} />}
               </div>
             )}
 
@@ -286,6 +276,74 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
   );
 }
 
+function AttachmentPreview({ att, onRemove }: { att: ChatAttachment; onRemove: () => void }) {
+  const isImage = att.mime.startsWith("image/");
+  const spec = getFileSpec(att.name, att.mime);
+  return (
+    <div className="group relative">
+      {isImage ? (
+        <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-border bg-[oklch(0.97_0_0)] shadow-sm">
+          <img src={att.previewUrl ?? att.url} alt={att.name} className="h-full w-full object-cover" />
+        </div>
+      ) : (
+        <div className="flex h-20 w-64 items-center gap-3 rounded-2xl border border-border bg-background px-3 shadow-sm">
+          <div
+            className="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-[10px] font-bold"
+            style={{ background: spec.bg, color: spec.fg }}
+          >
+            {spec.label}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-medium text-foreground">{att.name}</div>
+            <div className="text-[11px] text-muted-foreground">{formatBytes(att.size)}</div>
+          </div>
+        </div>
+      )}
+      <button
+        onClick={onRemove}
+        className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-foreground text-background shadow-md transition hover:scale-110"
+        aria-label="Remove"
+      >
+        <X size={12} strokeWidth={2.5} />
+      </button>
+    </div>
+  );
+}
+
+function ToggleChip({
+  active,
+  onClick,
+  icon,
+  label,
+  luxe,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  luxe: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition active:scale-95 ${
+        active
+          ? luxe
+            ? "border-white bg-white text-black"
+            : "border-foreground bg-foreground text-background"
+          : luxe
+            ? "border-white/25 bg-transparent text-white hover:bg-white/10"
+            : "border-border bg-background text-foreground hover:bg-[oklch(0.97_0_0)]"
+      }`}
+      aria-pressed={active}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
 function MenuItem({
   icon,
   label,
@@ -313,30 +371,5 @@ function MenuItem({
         {hint}
       </span>
     </button>
-  );
-}
-
-function ModePill({
-  icon,
-  label,
-  onClear,
-  luxe,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClear: () => void;
-  luxe: boolean;
-}) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-        luxe ? "border-white/30 bg-white/10 text-white" : "border-foreground/15 bg-foreground/5 text-foreground"
-      }`}
-    >
-      {icon} {label}
-      <button onClick={onClear} className="-mr-1 ml-1 rounded-full p-0.5 hover:bg-foreground/10" aria-label={`Disable ${label}`}>
-        <X size={10} />
-      </button>
-    </span>
   );
 }
