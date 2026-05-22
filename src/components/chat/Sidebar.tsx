@@ -98,10 +98,15 @@ export function Sidebar({
         {/* Top bar */}
         {view === "home" ? (
           <div className="flex items-center justify-between px-5 pt-6 pb-2">
-            <div className="flex items-center gap-2.5">
-              <img src={logoUrl} alt="" className="h-7 w-7" />
+            <Link
+              to="/settings"
+              onClick={onToggle}
+              className="flex items-center gap-2.5 rounded-full pr-3 transition hover:bg-[oklch(0.97_0_0)]"
+              aria-label="Open settings"
+            >
+              <UserAvatar />
               <h1 className="text-2xl font-semibold tracking-tight">HalaGPT</h1>
-            </div>
+            </Link>
             <div className="flex items-center gap-1 rounded-full bg-[oklch(0.96_0_0)] px-1 py-1">
               <button
                 onClick={() => setSearching((s) => !s)}
