@@ -23,11 +23,26 @@ import {
   Palette,
   GraduationCap,
   Sparkles,
+  User,
   type LucideIcon,
 } from "lucide-react";
 import type { Conversation, Project } from "./types";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { auth } from "@/lib/firebase";
 import logoUrl from "@/assets/halagpt-logo.png";
+
+function UserAvatar() {
+  const photo = auth.currentUser?.photoURL;
+  if (photo) {
+    return <img src={photo} alt="" className="h-9 w-9 rounded-full border border-border object-cover" referrerPolicy="no-referrer" />;
+  }
+  return (
+    <span className="grid h-9 w-9 place-items-center rounded-full bg-[oklch(0.94_0_0)] text-foreground">
+      <User size={18} strokeWidth={2} />
+    </span>
+  );
+}
 
 type View = "home" | "projects" | "images";
 
