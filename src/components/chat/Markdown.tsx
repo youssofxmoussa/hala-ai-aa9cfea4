@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import remarkBreaks from "remark-breaks";
 import rehypeKatex from "rehype-katex";
 import rehypeHighlight from "rehype-highlight";
 import { useState } from "react";
@@ -16,16 +17,16 @@ function CodeBlock({ children, className }: { children?: React.ReactNode; classN
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <div className="group relative my-3 overflow-hidden rounded-2xl border border-border bg-[oklch(0.98_0_0)]">
-      <div className="flex items-center justify-between border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
-        <span className="font-mono lowercase tracking-wide">{lang}</span>
+    <div className="group relative my-4 overflow-hidden rounded-2xl border border-border bg-[oklch(0.985_0_0)]">
+      <div className="flex items-center justify-between border-b border-border bg-[oklch(0.97_0_0)] px-4 py-2 text-xs">
+        <span className="font-mono lowercase tracking-wide text-muted-foreground">{lang}</span>
         <button
           onClick={onCopy}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 hover:bg-accent transition"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-foreground/70 hover:bg-background hover:text-foreground transition"
           aria-label="Copy code"
         >
           {copied ? <Check size={13} /> : <Copy size={13} />}
-          <span>{copied ? "Copied" : "Copy"}</span>
+          <span className="font-medium">{copied ? "Copied" : "Copy"}</span>
         </button>
       </div>
       <pre className="!m-0 !rounded-none !border-0 !bg-transparent">
@@ -39,7 +40,7 @@ export function Markdown({ content }: { content: string }) {
   return (
     <div className="prose-chat">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]}
         rehypePlugins={[rehypeKatex, rehypeHighlight]}
         components={{
           pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
@@ -57,6 +58,23 @@ export function Markdown({ content }: { content: string }) {
               {children}
             </a>
           ),
+          table: ({ children }) => (
+            <div className="my-4 overflow-x-auto rounded-xl border border-border">
+              <table>{children}</table>
+            </div>
+          ),
+          input: (props: React.InputHTMLAttributes<HTMLInputElement>) =>
+            props.type === "checkbox" ? (
+              <input
+                type="checkbox"
+                disabled
+                checked={props.checked}
+                className="mr-2 h-4 w-4 rounded border-border align-middle accent-foreground"
+                readOnly
+              />
+            ) : (
+              <input {...props} />
+            ),
         }}
       >
         {content}

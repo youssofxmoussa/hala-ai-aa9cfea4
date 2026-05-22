@@ -4,6 +4,7 @@ export type ChatAttachment = {
   url: string;        // public URL the AI can fetch
   name: string;
   mime: string;       // e.g. image/png, application/pdf
+  size?: number;      // bytes
   previewUrl?: string; // optional local preview (data URL) for instant render
 };
 
@@ -13,6 +14,7 @@ export type ChatMessage = {
   content: string;
   images?: ChatImage[];       // legacy / preview-only (deprecated)
   attachments?: ChatAttachment[];
+  feedback?: "up" | "down" | null;
   createdAt: number;
 };
 
