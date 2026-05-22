@@ -12,13 +12,13 @@ import {
   Zap,
 } from "lucide-react";
 import logoUrl from "@/assets/halagpt-logo.png";
-import { supabase } from "@/integrations/supabase/client";
+import { waitForAuthUser } from "@/lib/firebase";
 
 export const Route = createFileRoute("/")({
   ssr: false,
   beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: "/chat" });
+    const user = await waitForAuthUser();
+    if (user) throw redirect({ to: "/chat" });
   },
   component: Home,
   head: () => ({

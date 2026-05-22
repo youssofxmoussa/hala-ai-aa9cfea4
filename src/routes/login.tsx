@@ -1,7 +1,12 @@
 import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  onAuthStateChanged,
+} from "firebase/auth";
+import { auth, googleProvider, waitForAuthUser } from "@/lib/firebase";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
@@ -9,8 +14,8 @@ export const Route = createFileRoute("/login")({
     redirect: typeof search.redirect === "string" ? search.redirect : "/chat",
   }),
   beforeLoad: async ({ search }) => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: search.redirect });
+    const user = await waitForAuthUser();
+    if (user) throw redirect({ to: search.redirect });
   },
   component: LoginPage,
   head: () => ({
@@ -22,38 +27,53 @@ export const Route = createFileRoute("/login")({
   }),
 });
 
+type Mode = "signin" | "signup";
+
 function LoginPage() {
   const navigate = useNavigate();
   const search = Route.useSearch();
-  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<Mode>("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState<null | "email" | "google">(null);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (session) navigate({ to: search.redirect });
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) navigate({ to: search.redirect });
     });
     return () => {
       clearTimeout(t);
-      subscription.unsubscribe();
+      unsub();
     };
   }, [navigate, search.redirect]);
 
-  const signIn = async () => {
-    setLoading(true);
+  const submitEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading("email");
     setError(null);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin + "/chat",
-      });
-      if (result.error) {
-        setError(result.error.message);
-        setLoading(false);
+      if (mode === "signin") {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign-in failed");
-      setLoading(false);
+    } catch (err) {
+      setError(prettyError(err));
+      setLoading(null);
+    }
+  };
+
+  const signInGoogle = async () => {
+    setLoading("google");
+    setError(null);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      setError(prettyError(err));
+      setLoading(null);
     }
   };
 
@@ -72,9 +92,9 @@ function LoginPage() {
           HalaGPT
         </h1>
 
-        <div className="h-16" />
+        <div className="h-10" />
 
-        {/* Google button — slides UP from bottom into center */}
+        {/* Auth card — slides UP from bottom into center */}
         <div
           className="w-full transition-all ease-[cubic-bezier(0.22,1,0.36,1)]"
           style={{
@@ -84,13 +104,73 @@ function LoginPage() {
             transform: mounted ? "translateY(0)" : "translateY(90vh)",
           }}
         >
+          {/* Tabs */}
+          <div className="mb-5 flex rounded-full border border-black/10 bg-black/[0.03] p-1 text-sm">
+            <button
+              type="button"
+              onClick={() => { setMode("signin"); setError(null); }}
+              className={`flex-1 rounded-full py-2 font-medium transition ${
+                mode === "signin" ? "bg-black text-white shadow-sm" : "text-black/60 hover:text-black"
+              }`}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode("signup"); setError(null); }}
+              className={`flex-1 rounded-full py-2 font-medium transition ${
+                mode === "signup" ? "bg-black text-white shadow-sm" : "text-black/60 hover:text-black"
+              }`}
+            >
+              Sign up
+            </button>
+          </div>
+
+          <form onSubmit={submitEmail} className="space-y-3">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              placeholder="Email"
+              className="w-full rounded-2xl border border-black/15 bg-white px-4 py-3.5 text-[15px] text-black placeholder:text-black/40 outline-none transition focus:border-black/40"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              placeholder="Password"
+              className="w-full rounded-2xl border border-black/15 bg-white px-4 py-3.5 text-[15px] text-black placeholder:text-black/40 outline-none transition focus:border-black/40"
+            />
+            <button
+              type="submit"
+              disabled={loading !== null}
+              className="inline-flex w-full items-center justify-center rounded-2xl bg-black px-5 py-3.5 text-[15px] font-medium text-white transition active:scale-[0.99] hover:opacity-90 disabled:opacity-60"
+            >
+              {loading === "email"
+                ? mode === "signin" ? "Signing in…" : "Creating account…"
+                : mode === "signin" ? "Sign in" : "Create account"}
+            </button>
+          </form>
+
+          <div className="my-5 flex items-center gap-3 text-xs text-black/40">
+            <div className="h-px flex-1 bg-black/10" />
+            or
+            <div className="h-px flex-1 bg-black/10" />
+          </div>
+
           <button
-            onClick={signIn}
-            disabled={loading}
-            className="group inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-black/15 bg-white px-5 py-4 text-[15px] font-medium text-black transition active:scale-[0.99] hover:bg-black/[0.03] disabled:opacity-60"
+            type="button"
+            onClick={signInGoogle}
+            disabled={loading !== null}
+            className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-black/15 bg-white px-5 py-3.5 text-[15px] font-medium text-black transition active:scale-[0.99] hover:bg-black/[0.03] disabled:opacity-60"
           >
             <GoogleMark />
-            {loading ? "Opening Google…" : "Continue with Google"}
+            {loading === "google" ? "Opening Google…" : "Continue with Google"}
           </button>
 
           {error && (
@@ -102,6 +182,23 @@ function LoginPage() {
       </main>
     </div>
   );
+}
+
+function prettyError(err: unknown): string {
+  const code = (err as { code?: string })?.code;
+  const map: Record<string, string> = {
+    "auth/invalid-email": "That email looks invalid.",
+    "auth/invalid-credential": "Wrong email or password.",
+    "auth/wrong-password": "Wrong password.",
+    "auth/user-not-found": "No account for that email.",
+    "auth/email-already-in-use": "An account already exists for that email.",
+    "auth/weak-password": "Password must be at least 6 characters.",
+    "auth/popup-closed-by-user": "Google sign-in was cancelled.",
+    "auth/popup-blocked": "Popup blocked — allow popups and try again.",
+    "auth/network-request-failed": "Network error — check your connection.",
+  };
+  if (code && map[code]) return map[code];
+  return err instanceof Error ? err.message : "Sign-in failed.";
 }
 
 function GoogleMark() {
