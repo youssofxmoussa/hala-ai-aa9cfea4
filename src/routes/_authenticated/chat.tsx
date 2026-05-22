@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PanelLeft, MessageSquareDashed, SquarePen, LogOut } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
+import { signOut as firebaseSignOut } from "firebase/auth";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { Composer } from "@/components/chat/Composer";
 import { ChatView } from "@/components/chat/ChatView";
-import { uploadChatAttachment } from "@/lib/uploads.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { auth } from "@/lib/firebase";
 import type { ChatAttachment, ChatMessage, Conversation, Project } from "@/components/chat/types";
 
 export const Route = createFileRoute("/_authenticated/chat")({
@@ -53,7 +52,6 @@ function HalaGPTChat() {
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [temporary, setTemporary] = useState(false);
-  const uploadFn = useServerFn(uploadChatAttachment);
 
   useEffect(() => {
     const c = loadJson<Conversation[]>(STORAGE_KEY, []);
@@ -88,8 +86,8 @@ function HalaGPTChat() {
 
   const handleUpload = async (file: File): Promise<ChatAttachment> => {
     const dataUrl = await fileToDataUrl(file);
-    const { url, mime } = await uploadFn({ data: { dataUrl, filename: file.name } });
-    return { url, mime, name: file.name, previewUrl: mime.startsWith("image/") ? dataUrl : undefined };
+    const mime = file.type || "application/octet-stream";
+    return { url: dataUrl, mime, name: file.name, previewUrl: mime.startsWith("image/") ? dataUrl : undefined };
   };
 
   const callApi = async (msgs: ChatMessage[], deepThink: boolean): Promise<string> => {
@@ -221,7 +219,7 @@ function HalaGPTChat() {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await firebaseSignOut(auth);
     if (typeof window !== "undefined") window.location.href = "/";
   };
 
