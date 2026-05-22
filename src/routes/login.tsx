@@ -29,7 +29,7 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e: string, session: { user: unknown } | null) => {
       if (session) navigate({ to: search.redirect });
     });
     return () => subscription.unsubscribe();
