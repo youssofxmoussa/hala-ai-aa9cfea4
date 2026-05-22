@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import {
   ArrowRight,
   Eye,
@@ -12,20 +12,27 @@ import {
   Zap,
 } from "lucide-react";
 import logoUrl from "@/assets/halagpt-logo.png";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
+  ssr: false,
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) throw redirect({ to: "/chat" });
+  },
   component: Home,
   head: () => ({
     meta: [
-      { title: "Hala AI" },
+      { title: "Hala AI — Palestinian AI assistant" },
       {
         name: "description",
-        content: "Hala is a Palestinian AI from Palestine.",
+        content:
+          "Hala is a Palestinian AI assistant. Chat, vision & OCR, web search, code, and deep reasoning — in any language.",
       },
       { property: "og:title", content: "Hala AI" },
       {
         property: "og:description",
-        content: "Hala is a Palestinian AI from Palestine.",
+        content: "A Palestinian AI assistant — refined, fast, multilingual.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "/" },
