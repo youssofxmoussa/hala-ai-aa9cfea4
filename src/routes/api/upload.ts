@@ -1,10 +1,9 @@
-// Accept a user file → forward to a temporary upstream host (litterbox, 1h
-// retention) → return a URL on OUR domain that proxies the bytes through
-// /api/public/files/<b64>/<filename>. The external HalaGPT API then sees only our
-// own domain in its `link` field.
 import { createFileRoute } from "@tanstack/react-router";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const MAX_SIZE = 50 * 1024 * 1024;
+const BUCKET = "chat-uploads";
+const RETENTION_MS = 2 * 60 * 60 * 1000;
 
 function b64urlEncode(s: string): string {
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -20,30 +19,21 @@ export const Route = createFileRoute("/api/upload")({
           if (!(file instanceof File)) return json({ error: "No file" }, 400);
           if (file.size > MAX_SIZE) return json({ error: "File too large (max 50MB)" }, 413);
 
-          const out = new FormData();
-          out.append("reqtype", "fileupload");
-          out.append("time", "1h");
-          out.append("fileToUpload", file, file.name || "file");
-
-          const upRes = await fetch(
-            "https://litterbox.catbox.moe/resources/internals/api.php",
-            { method: "POST", body: out },
-          );
-          const upstream = (await upRes.text()).trim();
-          if (!upRes.ok || !upstream.startsWith("http")) {
-            return json({ error: `Upload service error: ${upstream.slice(0, 200)}` }, 502);
-          }
-
+          await ensureUploadBucket();
+          void cleanupOldUploads();
           const safeName = (file.name || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
-          const token = b64urlEncode(upstream);
-          const origin = new URL(request.url).origin;
-          const proxyUrl = `${origin}/api/public/files/${token}/${encodeURIComponent(safeName)}`;
+          const path = `tmp/${Date.now()}-${crypto.randomUUID()}-${safeName || "file"}`;
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          const { error } = await supabaseAdmin.storage.from(BUCKET).upload(path, bytes, {
+            contentType: file.type || "application/octet-stream",
+            upsert: false,
+          });
+          if (error) return json({ error: `Upload failed: ${error.message}` }, 502);
+
+          const { data: pub } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
 
           return json({
-            // Use the temporary public URL for the AI OCR call because Lovable's
-            // unpublished preview host is login-protected for outside services.
-            url: upstream,
-            proxyUrl,
+            url: pub.publicUrl,
             name: file.name || "file",
             mime: file.type || "application/octet-stream",
             size: file.size,
