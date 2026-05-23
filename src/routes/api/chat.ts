@@ -8,7 +8,7 @@ type IncomingMsg = {
   content: string;
   links?: string[];
 };
-type ChatBody = { messages: IncomingMsg[]; deepThink?: boolean };
+type ChatBody = { messages: IncomingMsg[]; deepThink?: boolean; memory?: string[] };
 
 async function processMessage(m: IncomingMsg): Promise<HalaMsg> {
   if (!m.links || m.links.length === 0) {
@@ -17,8 +17,11 @@ async function processMessage(m: IncomingMsg): Promise<HalaMsg> {
   const { docs, visionLinks } = await extractAttachments(m.links);
   let content = m.content;
   if (docs.length > 0) {
-    const blocks = docs.map((d) => `\n\n[Attached file: ${d.name}]\n\`\`\`\n${d.text}\n\`\`\``).join("");
-    content = `${content}${blocks}`;
+    const header = `\n\n[The user attached ${docs.length} file${docs.length > 1 ? "s" : ""}. Read each one carefully and use it in your answer.]`;
+    const blocks = docs
+      .map((d) => `\n\n[Attached file: ${d.name}]\n\`\`\`\n${d.text}\n\`\`\``)
+      .join("");
+    content = `${content}${header}${blocks}`;
   }
   return { role: m.role, content, links: visionLinks };
 }
