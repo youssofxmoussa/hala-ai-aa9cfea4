@@ -11,7 +11,7 @@ function b64urlDecode(s: string): string {
   return atob(s);
 }
 
-export const Route = createFileRoute("/api/files/$")({
+export const Route = createFileRoute("/api/public/files/$")({
   server: {
     handlers: {
       HEAD: async ({ params }: { params: { _splat: string } }) => proxyFile(params, true),
