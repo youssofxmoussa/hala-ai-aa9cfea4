@@ -8,7 +8,11 @@ import { defineConfig } from "vite";
     plugins: [
       tsConfigPaths(),
       tailwindcss(),
-      tanstackStart(),
+      tanstackStart({
+        server: {
+          preset: "vercel",
+        },
+      }),
       viteReact(),
     ],
     resolve: {
