@@ -69,6 +69,40 @@ function HalaGPTChat() {
   useEffect(() => {
     if (typeof window !== "undefined") localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
   }, [projects]);
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem(MEMORY_KEY, JSON.stringify(memory));
+  }, [memory]);
+
+  const learnFromExchange = async (userMsg: ChatMessage, replyText: string) => {
+    try {
+      const res = await fetch("/api/memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "user", content: userMsg.content },
+            { role: "assistant", content: replyText },
+          ],
+        }),
+      });
+      const data = (await res.json()) as { facts?: string[] };
+      const fresh = (data.facts ?? []).map((s) => s.trim()).filter(Boolean);
+      if (fresh.length === 0) return;
+      setMemory((prev) => {
+        const seen = new Set(prev.map((f) => f.toLowerCase()));
+        const merged = [...prev];
+        for (const f of fresh) {
+          if (!seen.has(f.toLowerCase())) {
+            merged.push(f);
+            seen.add(f.toLowerCase());
+          }
+        }
+        return merged.slice(-MAX_MEMORY);
+      });
+    } catch {
+      // memory learning is best-effort
+    }
+  };
 
   const active = useMemo(() => conversations.find((c) => c.id === activeId) ?? null, [conversations, activeId]);
   const isEmpty = !active || active.messages.length === 0;
