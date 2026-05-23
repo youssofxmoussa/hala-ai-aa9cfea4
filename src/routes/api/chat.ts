@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/chat")({
             });
           }
           const msgs: HalaMsg[] = await Promise.all(body.messages.map(processMessage));
-          const content = await halaChat(msgs, { deepThink: !!body.deepThink });
+          const content = await halaChat(msgs, { deepThink: !!body.deepThink, memory: body.memory });
           return new Response(JSON.stringify({ content }), {
             headers: { "Content-Type": "application/json" },
           });
