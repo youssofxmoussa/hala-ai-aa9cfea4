@@ -145,6 +145,7 @@ function HalaGPTChat() {
   const callApi = async (msgs: ChatMessage[], deepThink: boolean): Promise<string> => {
     const payload = {
       deepThink,
+      memory,
       messages: msgs.map((m) => ({
         role: m.role,
         content: m.content,
