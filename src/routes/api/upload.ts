@@ -5,10 +5,6 @@ const MAX_SIZE = 50 * 1024 * 1024;
 const BUCKET = "chat-uploads";
 const RETENTION_MS = 2 * 60 * 60 * 1000;
 
-function b64urlEncode(s: string): string {
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
 export const Route = createFileRoute("/api/upload")({
   server: {
     handlers: {
@@ -52,4 +48,27 @@ function json(body: unknown, status = 200) {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+async function ensureUploadBucket() {
+  const { data } = await supabaseAdmin.storage.getBucket(BUCKET);
+  if (data) return;
+  const { error } = await supabaseAdmin.storage.createBucket(BUCKET, {
+    public: true,
+    fileSizeLimit: MAX_SIZE,
+  });
+  if (error && !/already exists/i.test(error.message)) throw new Error(`Storage setup failed: ${error.message}`);
+}
+
+async function cleanupOldUploads() {
+  try {
+    const { data } = await supabaseAdmin.storage.from(BUCKET).list("tmp", { limit: 100, sortBy: { column: "created_at", order: "asc" } });
+    const now = Date.now();
+    const expired = (data ?? [])
+      .filter((item) => item.created_at && now - new Date(item.created_at).getTime() > RETENTION_MS)
+      .map((item) => `tmp/${item.name}`);
+    if (expired.length > 0) await supabaseAdmin.storage.from(BUCKET).remove(expired);
+  } catch {
+    // Cleanup is best-effort and should never block chat uploads.
+  }
 }
