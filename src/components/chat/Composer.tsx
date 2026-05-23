@@ -9,8 +9,10 @@ import {
   Camera,
   Image as ImageIcon,
   Paperclip,
-  Sparkles,
+  Globe,
+  ImagePlus,
   Check,
+  Loader2,
 } from "lucide-react";
 import type { ChatAttachment } from "./types";
 import { FileGlyph, formatBytes } from "./FileIcon";
@@ -26,10 +28,18 @@ type Props = {
 
 const MAX_ATTACHMENTS = 10;
 
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
 export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onImageRequest }: Props) {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
-  const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deepThink, setDeepThink] = useState(false);
@@ -39,6 +49,8 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const uploading = attachments.some((a) => a.uploading);
 
   useEffect(() => {
     const el = taRef.current;
@@ -64,30 +76,48 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setUploading(true);
-    try {
-      const slots = MAX_ATTACHMENTS - attachments.length;
-      const list = Array.from(files).slice(0, slots);
-      const uploaded: ChatAttachment[] = [];
-      for (const f of list) {
+    const slots = MAX_ATTACHMENTS - attachments.length;
+    const list = Array.from(files).slice(0, slots);
+
+    // Insert optimistic placeholders with previewUrl + uploading:true
+    const placeholders: ChatAttachment[] = await Promise.all(
+      list.map(async (f) => ({
+        url: "",
+        name: f.name,
+        mime: f.type || "application/octet-stream",
+        size: f.size,
+        previewUrl: f.type.startsWith("image/") ? await fileToDataUrl(f) : undefined,
+        uploading: true,
+      })),
+    );
+    const startIdx = attachments.length;
+    setAttachments((prev) => [...prev, ...placeholders].slice(0, MAX_ATTACHMENTS));
+
+    // Upload in parallel and patch each slot in place
+    await Promise.all(
+      list.map(async (f, i) => {
+        const slot = startIdx + i;
         try {
-          const a = await onUpload(f);
-          uploaded.push(a);
+          const finalAtt = await onUpload(f);
+          setAttachments((prev) => {
+            const next = [...prev];
+            if (next[slot]) next[slot] = { ...finalAtt, uploading: false };
+            return next;
+          });
         } catch (e) {
           console.error("upload failed", e);
+          setAttachments((prev) => prev.filter((_, j) => j !== slot));
         }
-      }
-      setAttachments((prev) => [...prev, ...uploaded].slice(0, MAX_ATTACHMENTS));
-    } finally {
-      setUploading(false);
-    }
+      }),
+    );
   };
 
   const submit = () => {
     const t = text.trim();
-    if (!t && attachments.length === 0) return;
+    const ready = attachments.filter((a) => !a.uploading);
+    if (!t && ready.length === 0) return;
     if (loading || uploading) return;
-    onSend(t, attachments, { deepThink, search });
+    onSend(t, ready, { deepThink, search });
     setText("");
     setAttachments([]);
     setSearch(false);
@@ -175,18 +205,14 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
                   <ActiveChip icon={<Lightbulb size={13} />} label="Thinking" onClear={() => setDeepThink(false)} luxe={luxe} />
                 )}
                 {search && (
-                  <ActiveChip icon={<Sparkles size={13} />} label="Search" onClear={() => setSearch(false)} luxe={luxe} />
+                  <ActiveChip icon={<Globe size={13} />} label="Search" onClear={() => setSearch(false)} luxe={luxe} />
                 )}
               </div>
             )}
 
             {menuOpen && (
               <div
-                className={`absolute bottom-12 left-0 z-40 w-72 overflow-hidden rounded-3xl border shadow-2xl backdrop-blur-xl animate-rise ${
-                  luxe
-                    ? "border-white/10 bg-[oklch(0.16_0_0)]/95 text-white"
-                    : "border-border bg-[oklch(0.22_0_0)] text-white"
-                }`}
+                className="absolute bottom-12 left-0 z-40 w-72 overflow-hidden rounded-3xl border border-border bg-background text-foreground shadow-[0_24px_60px_-20px_rgba(0,0,0,0.25)] backdrop-blur-xl animate-rise"
               >
                 <MenuItem
                   icon={<Camera size={18} />}
@@ -213,11 +239,20 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
                   }}
                 />
                 <MenuItem
-                  icon={<Sparkles size={18} />}
+                  icon={<ImagePlus size={18} />}
                   label="Create image"
                   onClick={() => {
                     setMenuOpen(false);
                     onImageRequest?.();
+                  }}
+                />
+                <MenuItem
+                  icon={<Globe size={18} />}
+                  label="Search"
+                  active={search}
+                  onClick={() => {
+                    setSearch((s) => !s);
+                    setMenuOpen(false);
                   }}
                 />
                 <MenuItem
@@ -230,12 +265,6 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
                   }}
                 />
               </div>
-            )}
-
-            {uploading && (
-              <span className={`text-[11px] font-medium ${luxe ? "text-white/60" : "text-muted-foreground"}`}>
-                uploading…
-              </span>
             )}
 
             <input
@@ -286,7 +315,7 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
           ) : (
             <button
               onClick={submit}
-              disabled={(!text.trim() && attachments.length === 0) || uploading}
+              disabled={(!text.trim() && attachments.filter((a) => !a.uploading).length === 0) || uploading}
               className={`grid h-9 w-9 place-items-center rounded-full transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-25 ${
                 luxe ? "bg-white text-[#000]" : "bg-foreground text-background"
               }`}
@@ -314,30 +343,50 @@ function AttachmentPreview({ att, onRemove, luxe }: { att: ChatAttachment; onRem
             luxe ? "border-white/10 bg-white/5" : "border-border bg-[oklch(0.97_0_0)]"
           }`}
         >
-          <img src={att.previewUrl ?? att.url} alt={att.name} className="h-full w-full object-cover" />
+          <img
+            src={att.previewUrl ?? att.url}
+            alt={att.name}
+            className={`h-full w-full object-cover transition ${att.uploading ? "scale-105 brightness-75" : ""}`}
+          />
+          {att.uploading && (
+            <div className="absolute inset-0 grid place-items-center bg-black/35 backdrop-blur-[2px]">
+              <Loader2 size={22} className="animate-spin text-white drop-shadow" strokeWidth={2.5} />
+            </div>
+          )}
         </div>
       ) : (
         <div
-          className={`flex h-[72px] w-[240px] items-center gap-3 rounded-2xl border px-3 shadow-sm ${
+          className={`relative flex h-[72px] w-[240px] items-center gap-3 rounded-2xl border px-3 shadow-sm ${
             luxe ? "border-white/10 bg-white/5 text-white" : "border-border bg-background text-foreground"
           }`}
         >
-          <FileGlyph name={att.name} mime={att.mime} size={42} />
+          <div className="relative">
+            <FileGlyph name={att.name} mime={att.mime} size={42} />
+            {att.uploading && (
+              <div className="absolute inset-0 grid place-items-center rounded-lg bg-black/35 backdrop-blur-[2px]">
+                <Loader2 size={16} className="animate-spin text-white" strokeWidth={2.5} />
+              </div>
+            )}
+          </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold leading-tight">{att.name}</div>
             <div className={`text-[11px] mt-0.5 ${luxe ? "text-white/55" : "text-muted-foreground"}`}>
-              {(att.name.split(".").pop() ?? "file").toUpperCase()} · {formatBytes(att.size)}
+              {att.uploading
+                ? "Uploading…"
+                : `${(att.name.split(".").pop() ?? "file").toUpperCase()} · ${formatBytes(att.size)}`}
             </div>
           </div>
         </div>
       )}
-      <button
-        onClick={onRemove}
-        className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-foreground text-background shadow-md transition hover:scale-110"
-        aria-label="Remove"
-      >
-        <X size={12} strokeWidth={2.5} />
-      </button>
+      {!att.uploading && (
+        <button
+          onClick={onRemove}
+          className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-foreground text-background shadow-md transition hover:scale-110"
+          aria-label="Remove"
+        >
+          <X size={12} strokeWidth={2.5} />
+        </button>
+      )}
     </div>
   );
 }
@@ -382,11 +431,13 @@ function MenuItem({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-4 px-5 py-3.5 text-left text-[15px] transition hover:bg-white/[0.06] active:bg-white/[0.1]"
+      className="flex w-full items-center gap-4 px-5 py-3.5 text-left text-[15px] transition hover:bg-[oklch(0.96_0_0)] active:bg-[oklch(0.94_0_0)]"
     >
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/[0.08]">{icon}</span>
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[oklch(0.96_0_0)] text-foreground">
+        {icon}
+      </span>
       <span className="flex-1 font-medium">{label}</span>
-      {active && <Check size={16} className="text-white/80" />}
+      {active && <Check size={16} className="text-foreground/80" />}
     </button>
   );
 }
