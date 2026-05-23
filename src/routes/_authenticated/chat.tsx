@@ -22,6 +22,8 @@ export const Route = createFileRoute("/_authenticated/chat")({
 
 const STORAGE_KEY = "halagpt:conversations:v2";
 const PROJECTS_KEY = "halagpt:projects:v1";
+const MEMORY_KEY = "halagpt:memory:v1";
+const MAX_MEMORY = 120;
 
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
