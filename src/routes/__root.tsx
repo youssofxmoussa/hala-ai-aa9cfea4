@@ -70,6 +70,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "format-detection", content: "telephone=no" },
+      { property: "og:title", content: "Hala AI" },
+      { name: "twitter:title", content: "Hala AI" },
+      { property: "og:description", content: "Hala is a Palestinian AI from Palestine." },
+      { name: "twitter:description", content: "Hala is a Palestinian AI from Palestine." },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
