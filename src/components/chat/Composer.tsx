@@ -5,14 +5,15 @@ import {
   Square,
   X,
   FileImage,
-  Brain,
-  Globe,
+  Lightbulb,
+  Camera,
   Image as ImageIcon,
   Paperclip,
+  Sparkles,
   Check,
 } from "lucide-react";
 import type { ChatAttachment } from "./types";
-import { getFileSpec, formatBytes } from "./FileIcon";
+import { FileGlyph, formatBytes } from "./FileIcon";
 
 type Props = {
   onSend: (text: string, attachments: ChatAttachment[], opts: { deepThink: boolean; search: boolean }) => void;
@@ -24,8 +25,6 @@ type Props = {
 };
 
 const MAX_ATTACHMENTS = 10;
-// Accept literally anything
-const ACCEPT = "*/*";
 
 export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onImageRequest }: Props) {
   const [text, setText] = useState("");
@@ -35,6 +34,8 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
   const [menuOpen, setMenuOpen] = useState(false);
   const [deepThink, setDeepThink] = useState(false);
   const [search, setSearch] = useState(false);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -120,12 +121,15 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
         )}
 
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2.5 p-3 pb-1">
+          <div
+            className="flex gap-2.5 overflow-x-auto overflow-y-hidden scroll-smooth p-3 pb-1 snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          >
             {attachments.map((a, i) => (
               <AttachmentPreview
                 key={i}
                 att={a}
                 onRemove={() => setAttachments((p) => p.filter((_, j) => j !== i))}
+                luxe={luxe}
               />
             ))}
           </div>
@@ -165,60 +169,60 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
               <Plus size={17} strokeWidth={2.25} className={`transition duration-300 ${menuOpen ? "rotate-45" : "group-hover:rotate-90"}`} />
             </button>
 
-            {/* Inline Deep Think + Search buttons (always visible, ChatGPT-style pills) */}
-            <ToggleChip
-              active={deepThink}
-              onClick={() => setDeepThink((v) => !v)}
-              icon={<Brain size={14} />}
-              label="Think"
-              luxe={luxe}
-            />
-            <ToggleChip
-              active={search}
-              onClick={() => setSearch((v) => !v)}
-              icon={<Globe size={14} />}
-              label="Search"
-              luxe={luxe}
-            />
+            {(deepThink || search) && (
+              <div className="flex items-center gap-1.5">
+                {deepThink && (
+                  <ActiveChip icon={<Lightbulb size={13} />} label="Thinking" onClear={() => setDeepThink(false)} luxe={luxe} />
+                )}
+                {search && (
+                  <ActiveChip icon={<Sparkles size={13} />} label="Search" onClear={() => setSearch(false)} luxe={luxe} />
+                )}
+              </div>
+            )}
 
             {menuOpen && (
               <div
-                className={`absolute bottom-12 left-0 z-40 w-64 overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-xl animate-rise ${
-                  luxe ? "border-white/15 bg-[oklch(0.18_0_0)]/95 text-white" : "border-border bg-background text-foreground"
+                className={`absolute bottom-12 left-0 z-40 w-72 overflow-hidden rounded-3xl border shadow-2xl backdrop-blur-xl animate-rise ${
+                  luxe
+                    ? "border-white/10 bg-[oklch(0.16_0_0)]/95 text-white"
+                    : "border-border bg-[oklch(0.22_0_0)] text-white"
                 }`}
               >
                 <MenuItem
-                  icon={<Paperclip size={16} />}
-                  label="Attach files"
-                  hint="Any file"
+                  icon={<Camera size={18} />}
+                  label="Camera"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    cameraRef.current?.click();
+                  }}
+                />
+                <MenuItem
+                  icon={<ImageIcon size={18} />}
+                  label="Photos"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    photoRef.current?.click();
+                  }}
+                />
+                <MenuItem
+                  icon={<Paperclip size={18} />}
+                  label="Files"
                   onClick={() => {
                     setMenuOpen(false);
                     fileRef.current?.click();
                   }}
                 />
                 <MenuItem
-                  icon={<ImageIcon size={16} />}
+                  icon={<Sparkles size={18} />}
                   label="Create image"
-                  hint="Beta"
                   onClick={() => {
                     setMenuOpen(false);
                     onImageRequest?.();
                   }}
                 />
                 <MenuItem
-                  icon={<Globe size={16} />}
-                  label="Search the web"
-                  hint={search ? "On" : "Off"}
-                  active={search}
-                  onClick={() => {
-                    setSearch((s) => !s);
-                    setMenuOpen(false);
-                  }}
-                />
-                <MenuItem
-                  icon={<Brain size={16} />}
-                  label="Deep Think"
-                  hint={deepThink ? "On" : "Off"}
+                  icon={<Lightbulb size={18} />}
+                  label="Thinking"
                   active={deepThink}
                   onClick={() => {
                     setDeepThink((d) => !d);
@@ -229,13 +233,37 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
             )}
 
             {uploading && (
-              <span className={`text-[11px] font-medium ${luxe ? "text-white/60" : "text-muted-foreground"}`}>uploading…</span>
+              <span className={`text-[11px] font-medium ${luxe ? "text-white/60" : "text-muted-foreground"}`}>
+                uploading…
+              </span>
             )}
 
             <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <input
+              ref={photoRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <input
               ref={fileRef}
               type="file"
-              accept={ACCEPT}
+              accept="*/*"
               multiple
               hidden
               onChange={(e) => {
@@ -276,26 +304,30 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
   );
 }
 
-function AttachmentPreview({ att, onRemove }: { att: ChatAttachment; onRemove: () => void }) {
+function AttachmentPreview({ att, onRemove, luxe }: { att: ChatAttachment; onRemove: () => void; luxe: boolean }) {
   const isImage = att.mime.startsWith("image/");
-  const spec = getFileSpec(att.name, att.mime);
   return (
-    <div className="group relative">
+    <div className="group relative shrink-0 snap-start animate-rise">
       {isImage ? (
-        <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-border bg-[oklch(0.97_0_0)] shadow-sm">
+        <div
+          className={`relative h-[72px] w-[72px] overflow-hidden rounded-2xl border shadow-sm ${
+            luxe ? "border-white/10 bg-white/5" : "border-border bg-[oklch(0.97_0_0)]"
+          }`}
+        >
           <img src={att.previewUrl ?? att.url} alt={att.name} className="h-full w-full object-cover" />
         </div>
       ) : (
-        <div className="flex h-20 w-64 items-center gap-3 rounded-2xl border border-border bg-background px-3 shadow-sm">
-          <div
-            className="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-[10px] font-bold"
-            style={{ background: spec.bg, color: spec.fg }}
-          >
-            {spec.label}
-          </div>
+        <div
+          className={`flex h-[72px] w-[240px] items-center gap-3 rounded-2xl border px-3 shadow-sm ${
+            luxe ? "border-white/10 bg-white/5 text-white" : "border-border bg-background text-foreground"
+          }`}
+        >
+          <FileGlyph name={att.name} mime={att.mime} size={42} />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-medium text-foreground">{att.name}</div>
-            <div className="text-[11px] text-muted-foreground">{formatBytes(att.size)}</div>
+            <div className="truncate text-[13px] font-semibold leading-tight">{att.name}</div>
+            <div className={`text-[11px] mt-0.5 ${luxe ? "text-white/55" : "text-muted-foreground"}`}>
+              {(att.name.split(".").pop() ?? "file").toUpperCase()} · {formatBytes(att.size)}
+            </div>
           </div>
         </div>
       )}
@@ -310,66 +342,51 @@ function AttachmentPreview({ att, onRemove }: { att: ChatAttachment; onRemove: (
   );
 }
 
-function ToggleChip({
-  active,
-  onClick,
+function ActiveChip({
   icon,
   label,
+  onClear,
   luxe,
 }: {
-  active: boolean;
-  onClick: () => void;
   icon: React.ReactNode;
   label: string;
+  onClear: () => void;
   luxe: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition active:scale-95 ${
-        active
-          ? luxe
-            ? "border-white bg-white text-black"
-            : "border-foreground bg-foreground text-background"
-          : luxe
-            ? "border-white/25 bg-transparent text-white hover:bg-white/10"
-            : "border-border bg-background text-foreground hover:bg-[oklch(0.97_0_0)]"
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium animate-rise ${
+        luxe ? "border-white bg-white text-black" : "border-foreground bg-foreground text-background"
       }`}
-      aria-pressed={active}
     >
       {icon}
       {label}
-    </button>
+      <button onClick={onClear} aria-label={`Disable ${label}`} className="grid h-4 w-4 place-items-center rounded-full hover:opacity-70">
+        <X size={10} strokeWidth={3} />
+      </button>
+    </span>
   );
 }
 
 function MenuItem({
   icon,
   label,
-  hint,
   onClick,
   active,
 }: {
   icon: React.ReactNode;
   label: string;
-  hint?: string;
   onClick?: () => void;
   active?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition hover:bg-accent/40"
+      className="flex w-full items-center gap-4 px-5 py-3.5 text-left text-[15px] transition hover:bg-white/[0.06] active:bg-white/[0.1]"
     >
-      <span className="inline-flex items-center gap-3">
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-foreground/5">{icon}</span>
-        <span className="font-medium">{label}</span>
-      </span>
-      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-        {active && <Check size={12} />}
-        {hint}
-      </span>
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/[0.08]">{icon}</span>
+      <span className="flex-1 font-medium">{label}</span>
+      {active && <Check size={16} className="text-white/80" />}
     </button>
   );
 }
