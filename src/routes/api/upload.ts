@@ -1,12 +1,14 @@
-// Server route that accepts any file and uploads it to a temporary file host
-// (litterbox.catbox.moe, 1-hour expiry — files auto-delete). Returns a public
-// URL the external HalaGPT vision/OCR API can fetch. This avoids exposing the
-// litterbox call to the browser (no CORS issues, no third-party domain in DOM
-// during upload) — the client only sees our /api/upload endpoint.
-
+// Accept a user file → forward to a temporary upstream host (litterbox, 1h
+// retention) → return a URL on OUR domain that proxies the bytes through
+// /api/files/<b64>/<filename>. The external HalaGPT API then sees only our
+// own domain in its `link` field.
 import { createFileRoute } from "@tanstack/react-router";
 
-const MAX_SIZE = 50 * 1024 * 1024; // 50MB cap
+const MAX_SIZE = 50 * 1024 * 1024;
+
+function b64urlEncode(s: string): string {
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
 
 export const Route = createFileRoute("/api/upload")({
   server: {
@@ -15,29 +17,30 @@ export const Route = createFileRoute("/api/upload")({
         try {
           const form = await request.formData();
           const file = form.get("file");
-          if (!(file instanceof File)) {
-            return json({ error: "No file" }, 400);
-          }
-          if (file.size > MAX_SIZE) {
-            return json({ error: "File too large (max 50MB)" }, 413);
-          }
+          if (!(file instanceof File)) return json({ error: "No file" }, 400);
+          if (file.size > MAX_SIZE) return json({ error: "File too large (max 50MB)" }, 413);
 
-          // Forward to litterbox (1h temporary file host)
           const out = new FormData();
           out.append("reqtype", "fileupload");
           out.append("time", "1h");
           out.append("fileToUpload", file, file.name || "file");
 
-          const res = await fetch(
+          const upRes = await fetch(
             "https://litterbox.catbox.moe/resources/internals/api.php",
             { method: "POST", body: out },
           );
-          const text = (await res.text()).trim();
-          if (!res.ok || !text.startsWith("http")) {
-            return json({ error: `Upload service error: ${text.slice(0, 200)}` }, 502);
+          const upstream = (await upRes.text()).trim();
+          if (!upRes.ok || !upstream.startsWith("http")) {
+            return json({ error: `Upload service error: ${upstream.slice(0, 200)}` }, 502);
           }
+
+          const safeName = (file.name || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+          const token = b64urlEncode(upstream);
+          const origin = new URL(request.url).origin;
+          const proxyUrl = `${origin}/api/files/${token}/${encodeURIComponent(safeName)}`;
+
           return json({
-            url: text,
+            url: proxyUrl,
             name: file.name || "file",
             mime: file.type || "application/octet-stream",
             size: file.size,

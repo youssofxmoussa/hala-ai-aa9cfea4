@@ -14,13 +14,27 @@ function detectDir(text: string): "ltr" | "rtl" {
   return rtlChars >= latinChars ? "rtl" : "ltr";
 }
 
-function splitThinking(text: string): { thinking: string | null; answer: string; thinkingOpen: boolean } {
+// If the upstream returned literal escape sequences (e.g. "\\n", "\\t",
+// "\\\""), decode them so Markdown actually renders newlines/quotes instead
+// of showing the backslash characters.
+function decodeEscapes(s: string): string {
+  if (!s) return s;
+  if (s.indexOf("\\n") === -1 && s.indexOf("\\t") === -1 && s.indexOf('\\"') === -1) return s;
+  return s
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t")
+    .replace(/\\"/g, '"');
+}
+
+function splitThinking(raw: string): { thinking: string | null; answer: string; thinkingOpen: boolean } {
+  const text = decodeEscapes(raw);
   const openIdx = text.indexOf("<thinking>");
   if (openIdx === -1) return { thinking: null, answer: text, thinkingOpen: false };
   const closeIdx = text.indexOf("</thinking>", openIdx);
   if (closeIdx === -1) {
     return {
-      thinking: text.slice(openIdx + "<thinking>".length),
+      thinking: text.slice(openIdx + "<thinking>".length).trim(),
       answer: "",
       thinkingOpen: true,
     };
@@ -137,11 +151,11 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
       {open && (
         <div
           dir={dir}
-          className={`border-t border-border px-4 py-3 text-[13px] leading-6 text-muted-foreground whitespace-pre-wrap ${
-            dir === "rtl" ? "text-right" : ""
+          className={`border-t border-border px-4 py-3 text-[13px] leading-6 text-muted-foreground ${
+            dir === "rtl" ? "[&_p]:text-right [&_li]:text-right" : ""
           }`}
         >
-          {text}
+          <Markdown content={text} />
         </div>
       )}
     </div>
