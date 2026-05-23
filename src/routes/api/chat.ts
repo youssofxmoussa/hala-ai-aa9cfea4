@@ -35,6 +35,10 @@ async function appendPdfText(content: string, links?: string[]) {
   return chunks.length ? `${content}\n\n${chunks.join("\n\n")}` : content;
 }
 
+function linksForVision(links?: string[]) {
+  return (links ?? []).filter((link) => !/\.pdf(?:$|[?#])/i.test(link));
+}
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
@@ -51,7 +55,7 @@ export const Route = createFileRoute("/api/chat")({
             body.messages.map(async (m) => ({
               role: m.role,
               content: await appendPdfText(m.content, m.links),
-              links: m.links,
+              links: linksForVision(m.links),
             })),
           );
           const content = await halaChat(msgs, { deepThink: !!body.deepThink });
