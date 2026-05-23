@@ -19,7 +19,7 @@ async function appendPdfText(content: string, links?: string[]) {
       const res = await fetch(link);
       if (!res.ok) continue;
       const bytes = new Uint8Array(await res.arrayBuffer());
-      const pdf = await getDocument({ data: bytes, disableWorker: true }).promise;
+      const pdf = await getDocument({ data: bytes }).promise;
       const pages: string[] = [];
       for (let pageNo = 1; pageNo <= Math.min(pdf.numPages, 20); pageNo++) {
         const page = await pdf.getPage(pageNo);
