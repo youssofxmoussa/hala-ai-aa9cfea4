@@ -151,17 +151,30 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
         )}
 
         {attachments.length > 0 && (
-          <div
-            className="flex gap-2.5 overflow-x-auto overflow-y-hidden scroll-smooth p-3 pb-1 snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {attachments.map((a, i) => (
-              <AttachmentPreview
-                key={i}
-                att={a}
-                onRemove={() => setAttachments((p) => p.filter((_, j) => j !== i))}
-                luxe={luxe}
-              />
-            ))}
+          <div className="relative">
+            <div
+              className="flex gap-2.5 overflow-x-auto overflow-y-visible scroll-smooth px-4 pt-4 pb-2 snap-x [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {attachments.map((a, i) => (
+                <AttachmentPreview
+                  key={i}
+                  att={a}
+                  onRemove={() => setAttachments((p) => p.filter((_, j) => j !== i))}
+                  luxe={luxe}
+                />
+              ))}
+            </div>
+            {/* edge fades hint at more content */}
+            <div
+              className={`pointer-events-none absolute left-0 top-0 h-full w-6 rounded-l-[28px] ${
+                luxe ? "bg-gradient-to-r from-black/40 to-transparent" : "bg-gradient-to-r from-background to-transparent"
+              }`}
+            />
+            <div
+              className={`pointer-events-none absolute right-0 top-0 h-full w-6 rounded-r-[28px] ${
+                luxe ? "bg-gradient-to-l from-black/40 to-transparent" : "bg-gradient-to-l from-background to-transparent"
+              }`}
+            />
           </div>
         )}
 
