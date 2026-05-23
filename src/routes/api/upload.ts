@@ -5,7 +5,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 const MAX_SIZE = 50 * 1024 * 1024;
-const PUBLIC_FILE_ORIGIN = "https://project--db9209e8-bb91-4727-a07b-1ed2b683bf35-dev.lovable.app";
 
 function b64urlEncode(s: string): string {
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -37,14 +36,14 @@ export const Route = createFileRoute("/api/upload")({
 
           const safeName = (file.name || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
           const token = b64urlEncode(upstream);
-          const requestOrigin = new URL(request.url).origin;
-          const publicOrigin = /localhost|127\.0\.0\.1|lovableproject\.com|id-preview--/.test(requestOrigin)
-            ? PUBLIC_FILE_ORIGIN
-            : requestOrigin;
-          const proxyUrl = `${publicOrigin}/api/public/files/${token}/${encodeURIComponent(safeName)}`;
+          const origin = new URL(request.url).origin;
+          const proxyUrl = `${origin}/api/public/files/${token}/${encodeURIComponent(safeName)}`;
 
           return json({
-            url: proxyUrl,
+            // Use the temporary public URL for the AI OCR call because Lovable's
+            // unpublished preview host is login-protected for outside services.
+            url: upstream,
+            proxyUrl,
             name: file.name || "file",
             mime: file.type || "application/octet-stream",
             size: file.size,
