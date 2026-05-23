@@ -352,49 +352,58 @@ function AttachmentPreview({ att, onRemove, luxe }: { att: ChatAttachment; onRem
     <div className="group relative shrink-0 snap-start animate-rise">
       {isImage ? (
         <div
-          className={`relative h-[72px] w-[72px] overflow-hidden rounded-2xl border shadow-sm ${
-            luxe ? "border-white/10 bg-white/5" : "border-border bg-[oklch(0.97_0_0)]"
-          }`}
+          className={`relative h-[76px] w-[76px] overflow-hidden rounded-2xl border shadow-sm transition ${
+            luxe ? "border-white/15 bg-white/5" : "border-border bg-[oklch(0.97_0_0)]"
+          } ${att.uploading ? "ring-2 ring-foreground/20" : ""}`}
         >
           <img
             src={att.previewUrl ?? att.url}
             alt={att.name}
-            className={`h-full w-full object-cover transition ${att.uploading ? "scale-105 brightness-75" : ""}`}
+            className={`h-full w-full object-cover transition duration-500 ${att.uploading ? "scale-110 blur-[2px] brightness-[0.55]" : ""}`}
           />
           {att.uploading && (
-            <div className="absolute inset-0 grid place-items-center bg-black/35 backdrop-blur-[2px]">
-              <Loader2 size={22} className="animate-spin text-white drop-shadow" strokeWidth={2.5} />
+            <div className="absolute inset-0 grid place-items-center bg-black/30 backdrop-blur-[1px]">
+              <div className="relative grid h-9 w-9 place-items-center rounded-full bg-white/15 backdrop-blur-md ring-1 ring-white/40">
+                <Loader2 size={18} className="animate-spin text-white" strokeWidth={2.75} />
+              </div>
             </div>
           )}
         </div>
       ) : (
         <div
-          className={`relative flex h-[72px] w-[240px] items-center gap-3 rounded-2xl border px-3 shadow-sm ${
-            luxe ? "border-white/10 bg-white/5 text-white" : "border-border bg-background text-foreground"
-          }`}
+          className={`relative flex h-[76px] w-[200px] sm:w-[240px] items-center gap-3 overflow-hidden rounded-2xl border px-3 shadow-sm transition ${
+            luxe ? "border-white/15 bg-white/[0.06] text-white" : "border-border bg-background text-foreground"
+          } ${att.uploading ? "ring-2 ring-foreground/15" : ""}`}
         >
-          <div className="relative">
-            <FileGlyph name={att.name} mime={att.mime} size={42} />
-            {att.uploading && (
-              <div className="absolute inset-0 grid place-items-center rounded-lg bg-black/35 backdrop-blur-[2px]">
-                <Loader2 size={16} className="animate-spin text-white" strokeWidth={2.5} />
-              </div>
-            )}
+          <div className="relative shrink-0">
+            <FileGlyph name={att.name} mime={att.mime} size={44} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold leading-tight">{att.name}</div>
-            <div className={`text-[11px] mt-0.5 ${luxe ? "text-white/55" : "text-muted-foreground"}`}>
+            <div className={`text-[11px] mt-0.5 truncate ${luxe ? "text-white/55" : "text-muted-foreground"}`}>
               {att.uploading
                 ? "Uploading…"
                 : `${(att.name.split(".").pop() ?? "file").toUpperCase()} · ${formatBytes(att.size)}`}
             </div>
+            {att.uploading && (
+              <div className={`mt-1.5 h-1 w-full overflow-hidden rounded-full ${luxe ? "bg-white/10" : "bg-foreground/10"}`}>
+                <div className={`h-full w-1/3 rounded-full ${luxe ? "bg-white/70" : "bg-foreground/70"} animate-[slide_1.2s_ease-in-out_infinite]`} />
+              </div>
+            )}
           </div>
+          {att.uploading && (
+            <div className="absolute inset-0 grid place-items-center bg-background/55 backdrop-blur-[2px] dark:bg-background/40">
+              <div className={`grid h-9 w-9 place-items-center rounded-full ${luxe ? "bg-white/15 ring-1 ring-white/40" : "bg-foreground/10 ring-1 ring-foreground/20"}`}>
+                <Loader2 size={18} className={`animate-spin ${luxe ? "text-white" : "text-foreground"}`} strokeWidth={2.75} />
+              </div>
+            </div>
+          )}
         </div>
       )}
       {!att.uploading && (
         <button
           onClick={onRemove}
-          className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-foreground text-background shadow-md transition hover:scale-110"
+          className="absolute -right-1.5 -top-1.5 z-10 grid h-6 w-6 place-items-center rounded-full bg-foreground text-background shadow-md ring-2 ring-background transition hover:scale-110"
           aria-label="Remove"
         >
           <X size={12} strokeWidth={2.5} />
