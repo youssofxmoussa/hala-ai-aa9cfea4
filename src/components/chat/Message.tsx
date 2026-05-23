@@ -151,11 +151,11 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
       {open && (
         <div
           dir={dir}
-          className={`border-t border-border px-4 py-3 text-[13px] leading-6 text-muted-foreground whitespace-pre-wrap ${
-            dir === "rtl" ? "text-right" : ""
+          className={`border-t border-border px-4 py-3 text-[13px] leading-6 text-muted-foreground ${
+            dir === "rtl" ? "[&_p]:text-right [&_li]:text-right" : ""
           }`}
         >
-          {text}
+          <Markdown content={text} />
         </div>
       )}
     </div>
