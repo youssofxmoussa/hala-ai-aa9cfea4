@@ -10,6 +10,31 @@ type IncomingMsg = {
 };
 type ChatBody = { messages: IncomingMsg[]; deepThink?: boolean };
 
+async function appendPdfText(content: string, links?: string[]) {
+  const pdfLinks = (links ?? []).filter((link) => /\.pdf(?:$|[?#])/i.test(link)).slice(0, 3);
+  if (pdfLinks.length === 0) return content;
+  const chunks: string[] = [];
+  for (const link of pdfLinks) {
+    try {
+      const res = await fetch(link);
+      if (!res.ok) continue;
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      const pdf = await getDocument({ data: bytes, disableWorker: true }).promise;
+      const pages: string[] = [];
+      for (let pageNo = 1; pageNo <= Math.min(pdf.numPages, 20); pageNo++) {
+        const page = await pdf.getPage(pageNo);
+        const text = await page.getTextContent();
+        pages.push(text.items.map((item) => ("str" in item ? item.str : "")).join(" "));
+      }
+      const extracted = pages.join("\n").trim();
+      if (extracted.length > 30) chunks.push(`[Extracted PDF text from ${link}]\n${extracted.slice(0, 20000)}`);
+    } catch (err) {
+      console.error("PDF extraction failed", err);
+    }
+  }
+  return chunks.length ? `${content}\n\n${chunks.join("\n\n")}` : content;
+}
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
