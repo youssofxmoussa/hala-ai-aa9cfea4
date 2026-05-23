@@ -54,11 +54,13 @@ function HalaGPTChat() {
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [temporary, setTemporary] = useState(false);
+  const [memory, setMemory] = useState<string[]>([]);
 
   useEffect(() => {
     const c = loadJson<Conversation[]>(STORAGE_KEY, []);
     setConversations(c);
     setProjects(loadJson<Project[]>(PROJECTS_KEY, []));
+    setMemory(loadJson<string[]>(MEMORY_KEY, []));
     if (c.length > 0) setActiveId(c[0].id);
   }, []);
   useEffect(() => {
