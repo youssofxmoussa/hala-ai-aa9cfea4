@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import "@tanstack/react-start";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { halaChat, type HalaMsg } from "@/lib/halagpt.server";
 
 type IncomingMsg = {
@@ -21,11 +22,13 @@ export const Route = createFileRoute("/api/chat")({
               headers: { "Content-Type": "application/json" },
             });
           }
-          const msgs: HalaMsg[] = body.messages.map((m) => ({
-            role: m.role,
-            content: m.content,
-            links: m.links,
-          }));
+          const msgs: HalaMsg[] = await Promise.all(
+            body.messages.map(async (m) => ({
+              role: m.role,
+              content: await appendPdfText(m.content, m.links),
+              links: m.links,
+            })),
+          );
           const content = await halaChat(msgs, { deepThink: !!body.deepThink });
           return new Response(JSON.stringify({ content }), {
             headers: { "Content-Type": "application/json" },
