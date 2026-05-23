@@ -220,6 +220,7 @@ function HalaGPTChat() {
             : c,
         ),
       );
+      if (!temporary) void learnFromExchange(userMsg, reply);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error";
       setConversations((prev) =>
