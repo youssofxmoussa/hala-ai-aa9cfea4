@@ -190,7 +190,7 @@ export function Composer({ onSend, loading, onStop, luxe = false, onUpload, onIm
             }
           }}
           rows={1}
-          placeholder={luxe ? "Temporary" : "Ask HalaGPT anything…"}
+          placeholder="Ask HalaGPT"
           className={`block w-full resize-none bg-transparent px-5 pt-4 pb-2 text-[15px] leading-6 outline-none ${
             luxe ? "placeholder:text-white/40" : "placeholder:text-muted-foreground"
           } ${dir === "rtl" ? "text-right" : ""}`}
